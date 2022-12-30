@@ -1,4 +1,6 @@
-##this file is based on pyspark packaging - we have customized it for zingg
+"""
+this file is based on pyspark packaging - we have customized it for zingg
+"""
 
 import importlib.util
 import glob
@@ -8,11 +10,16 @@ from setuptools import *
 from shutil import copyfile, copytree, rmtree
 from setuptools.command.install import install
 
+VERSION = __version__
+ZINGG_HOME = os.path.abspath("../")
+print("zingg home is ", ZINGG_HOME)
+
 try:
     exec(open("version.py").read())
 except IOError:
     print(
-        "Failed to load Zingg version file for packaging. You must be in Zingg's python dir.",
+        "Failed to load Zingg version file for packaging.",
+        "Make sure you are in %s/python"%ZINGG_HOME,
         file=sys.stderr,
     )
     sys.exit(-1)
@@ -23,16 +30,10 @@ try:
     spec.loader.exec_module(install_module)
 except IOError:
     print(
-        "Failed to load the installing module (install.py) which had to be "
-        "packaged together.",
+        "Failed to load required install module (install.py)",
         file=sys.stderr,
     )
     sys.exit(-1)
-
-VERSION = __version__
-ZINGG_HOME = os.path.abspath("../")
-
-print("zingg home is ", ZINGG_HOME)
 
 # Provide guidance about how to use setup.py
 incorrect_invocation_message = """
