@@ -6,17 +6,15 @@ import importlib.util
 import glob
 import os
 import sys
+from pathlib import Path
 from setuptools import *
 from shutil import copyfile, copytree, rmtree
 from setuptools.command.install import install
 
-VERSION = __version__
+# Establish ZINGG_HOME directory
 ZINGG_HOME = os.path.abspath("../")
-print("zingg home is ", ZINGG_HOME)
 
-try:
-    exec(open("version.py").read())
-except IOError:
+if not Path(ZINGG_HOME, "python", "install.py").exists():
     print(
         "Failed to load Zingg version file for packaging.",
         "Make sure you are in %s/python"%ZINGG_HOME,
@@ -24,6 +22,9 @@ except IOError:
     )
     sys.exit(-1)
 
+print("ZINGG_HOME is %", ZINGG_HOME)
+
+# Import install.py
 try:
     spec = importlib.util.spec_from_file_location("install", "install.py")
     install_module = importlib.util.module_from_spec(spec)
@@ -34,6 +35,8 @@ except IOError:
         file=sys.stderr,
     )
     sys.exit(-1)
+
+VERSION = __version__
 
 # Provide guidance about how to use setup.py
 incorrect_invocation_message = """
