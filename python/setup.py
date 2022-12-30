@@ -3,13 +3,35 @@ this file is based on pyspark packaging - we have customized it for zingg
 """
 
 import importlib.util
-import glob
 import os
 import sys
 from pathlib import Path
 from setuptools import *
 from shutil import copyfile, copytree, rmtree
 from setuptools.command.install import install
+
+class InstallCommand(install):
+    def run(self):
+        install.run(self)
+
+def tidy_temp_links(IN_ZINGG):
+    """
+    Clean up directories created for previous or failed versions of the build.
+    """
+    to_remove = ["jars", "scripts", "models", "examples", "phases", "config"]
+    if IN_ZINGG:
+        for directory in to_remove:
+            dead_path = Path("zingg", directory)
+            if dead_path.exists():
+                if os.name == "nt":
+                    rmtree(dead_path)
+                else:
+                    dead_path.unlink()
+
+
+# establish version
+with open("VERSION.txt", "r") as _fh:
+    __version__ = _fh.readline().strip()
 
 # Establish ZINGG_HOME directory
 ZINGG_HOME = os.path.abspath("../")
@@ -21,7 +43,6 @@ if not Path(ZINGG_HOME, "python", "install.py").exists():
         file=sys.stderr,
     )
     sys.exit(-1)
-
 print("ZINGG_HOME is %", ZINGG_HOME)
 
 # Import install.py
@@ -36,26 +57,31 @@ except IOError:
     )
     sys.exit(-1)
 
-VERSION = __version__
-
 # Provide guidance about how to use setup.py
 incorrect_invocation_message = """
-If you are installing zingg from zingg source, you must first build Zingg and
-run sdist.
+If you are installing zingg from zingg source, you must build the Zingg jarfiles
+before attempting to create the package with "setup.py build sdist"
 
-    To build zingg with maven you can run:
-     $ZINGG_HOME/mvn -DskipTests clean package
-    Building the source dist is done in the Python directory:
-      cd python
-      python setup.py sdist
-      pip install dist/*.tar.gz"""
+To build zingg with maven you can run:
 
+    $ZINGG_HOME/mvn -DskipTests clean package
+
+Building the source dist is done in the Python directory:
+
+    cd python
+    python setup.py sdist
+    pip install dist/*.tar.gz
+"""
 
 # Figure out where the jars are we need to package with zingg.
-JARS_PATH = glob.glob(os.path.join(ZINGG_HOME, "assembly/target"))
+JARS_PATH = Path(ZINGG_HOME, "assembly", "target")
 
-if len(JARS_PATH) == 1:
-    JARS_PATH = JARS_PATH[0]
+# No jars, no peace.
+jar_jar_blanks = "No zingg jars found. Run 'mvn -DskipTests clean package' in $ZINGG_HOME before attempting to build the package, please."
+if not JARS_PATH.exists():
+    # Uh oh! Empty list!
+    print(jar_jar_blanks, file=sys.stderr)
+    sys.exit(-1)
 
 print("jar path is ", JARS_PATH)
 
@@ -72,48 +98,26 @@ DATA_TARGET = os.path.join("zingg", "models")
 CONF_TARGET = os.path.join("zingg", "config")
 PHASES_TARGET = os.path.join("zingg", "phases")
 
-# Check and see if we are under the Zingg path in which case we need to build the symlink farm.
-# This is important because we only want to build the symlink farm while under Zingg otherwise we
-# want to use the symlink farm. And if the symlink farm exists under while under Zingg (e.g. a
-# partially built sdist) we should error and have the user sort it out.
-in_zingg = os.path.isfile("../core/src/main/java/zingg/Trainer.java") == 1
+# Check and see if we are under the Zingg path in which case we need to build
+# the symlink farm. This is important because we only want to build the symlink
+# farm while under Zingg otherwise we
+# want to use the symlink farm. And if the symlink farm exists under while
+# under Zingg (e.g. a partially built sdist) we should error and have the user
+# sort it out.
+IN_ZINGG = os.path.isfile("../core/src/main/java/zingg/Trainer.java") == 1
 
-
-def _supports_symlinks():
-    """Check if the system supports symlinks (e.g. *nix) or not."""
-    return getattr(os, "symlink", None) is not None
-
-
-class InstallCommand(install):
-    def run(self):
-        install.run(self)
-
-        # Make sure the destination is always clean.
-        # zingg_dist = os.path.join(self.install_lib, "zingg", "zingg-distribution")
-        # rmtree(zingg_dist, ignore_errors=True)
-
-        # if (1):
-        #     # Note that ZINGG_VERSION environment is just a testing purpose.
-        #     zingg_version = install_module.checked_versions(
-        #         os.environ.get("ZINGG_VERSION", VERSION).lower())
-
-        #     install_module.install_zingg(
-        #         dest=zingg_dist,
-        #         zingg_version=zingg_version)
-
+# assure we don't have junk files laying around
+tidy_temp_links(IN_ZINGG)
 
 try:
 
-    try:
-        os.makedirs("zingg")
-    except OSError:
-        # Don't worry if the directory already exists.
-        pass
+    os.makedirs("zingg", exist_ok=True)
 
-    if in_zingg:
-        # Construct the symlink farm - this is necessary since we can't refer to the path above the
-        # package root and we need to copy the jars and scripts which are up above the python root.
-        if _supports_symlinks():
+    if IN_ZINGG:
+        # Construct the symlink farm - this is necessary since we can't refer
+        # to the path above the package root and we need to copy the jars and
+        # scripts which are up above the python root.
+        if os.name == "posix":
             os.symlink(JARS_PATH, JARS_TARGET)
             os.symlink(SCRIPTS_PATH, SCRIPTS_TARGET)
             os.symlink(EXAMPLES_PATH, EXAMPLES_TARGET)
@@ -155,7 +159,7 @@ try:
 
     setup(
         name="zingg",
-        version=VERSION,
+        version=__version__,
         author="Zingg.AI",
         author_email="sonalgoyal4@gmail.com",
         description="Zingg Entity Resolution, Data Mastering and Deduplication",
@@ -185,7 +189,12 @@ try:
         include_package_data=True,
         scripts=scripts,
         license="http://www.apache.org/licenses/LICENSE-2.0",
-        install_requires=["py4j==0.10.9"],
+        install_requires=[
+            "py4j==0.10.9",
+            "numpy",
+            "pandas",
+            "pyspark",
+        ],
         extras_require={"zingg": ["pyspark>=3.1.2"]},
         classifiers=[
             "Programming Language :: Python :: 3",
@@ -196,20 +205,9 @@ try:
         keywords="Entity Resolution, deduplication, record linkage, data mastering, identity resolution",
         cmdclass={"install": InstallCommand,},
     )
+
 finally:
-    if in_zingg:
-        # Depending on cleaning up the symlink farm or copied version
-        if _supports_symlinks():
-            os.remove(os.path.join("zingg", "jars"))
-            os.remove(os.path.join("zingg", "scripts"))
-            os.remove(os.path.join("zingg", "models"))
-            os.remove(os.path.join("zingg", "examples"))
-            os.remove(os.path.join("zingg", "phases"))
-            os.remove(os.path.join("zingg", "config"))
-        else:
-            rmtree(os.path.join("zingg", "jars"))
-            rmtree(os.path.join("zingg", "scripts"))
-            rmtree(os.path.join("zingg", "models"))
-            rmtree(os.path.join("zingg", "examples"))
-            rmtree(os.path.join("zingg", "phases"))
-            rmtree(os.path.join("zingg", "config"))
+    tidy_temp_links(IN_ZINGG)
+
+
+
