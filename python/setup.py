@@ -191,9 +191,9 @@ try:
         license="http://www.apache.org/licenses/LICENSE-2.0",
         install_requires=[
             "py4j==0.10.9",
-            "numpy",
-            "pandas",
-            "pyspark",
+            "numpy==1.24.1",
+            "pandas==1.5.2",
+            "pysparki==3.1.3 ",
         ],
         extras_require={"zingg": ["pyspark>=3.1.2"]},
         classifiers=[
