@@ -158,7 +158,7 @@ try:
         long_description = f.read()
 
     setup(
-        name="zingg",
+        name="finance-zingg",
         version=__version__,
         author="Zingg.AI",
         author_email="sonalgoyal4@gmail.com",

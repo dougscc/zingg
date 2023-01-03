@@ -21,3 +21,6 @@ dist
 python/docs/_build/html
 python/docs/_build/_doctrees
 **/python/build/*
+.direnv
+.envrc
+*.egg-info
